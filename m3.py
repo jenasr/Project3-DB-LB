@@ -15,7 +15,11 @@ def get_db():
 
 app = FastAPI()
 
+
+
 # Posting win or loss: json: {status, timestamp, # of guesses}
 # Getting stats of user:
     # json{currentStreak, maxSreak, guesses, 1-6, fail, etc.}
-# Seems like we only need a post and a get for this MC.
+# Getting the top 10 user by number of wins
+# Getting the top 10 users by streak
+# Seems like we only need a post and 3 gets for this MC.
