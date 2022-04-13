@@ -5,6 +5,28 @@
 import contextlib
 import sqlite3
 from fastapi import FastAPI, Depends, HTTPException, status
+from pydantic import BaseModel
+
+
+class Guesses(BaseModel):
+        guess1: int
+        guess2: int
+        guess3: int
+        guess4: int
+        guess5: int
+        guess6: int
+        fail: int
+# Edit guess1 to 1, guess2 to 2, etc.
+class Stats(BaseModel):
+    """Json format for a player stats"""
+    currentStreak: int
+    maxStreak: int
+    guesses: Guesses
+    winPercentage: float
+    gamesPlayed: int
+    gamesWon: int
+    averageGuesses: int
+
 
 def get_db():
     """Connect words.db"""
@@ -16,8 +38,12 @@ def get_db():
 app = FastAPI()
 
 
+@app.post("")
+async def add_game_played(, db: sqlite3.Connection = Depends(get_db)):
+    """Posting a win or loss"""
+    pass
 
-# Posting win or loss: json: {status, timestamp, # of guesses}
+
 # Getting stats of user:
     # json{currentStreak, maxSreak, guesses, 1-6, fail, etc.}
 # Getting the top 10 user by number of wins
