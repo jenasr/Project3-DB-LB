@@ -1,20 +1,20 @@
-#! usr/bin/env python3
+#! /usr/bin/env python3
 
 """Microservice 3: Tracking users' wins and losses"""
 
 import contextlib
 import sqlite3
 from fastapi import FastAPI, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Guesses(BaseModel):
-        guess1: int
-        guess2: int
-        guess3: int
-        guess4: int
-        guess5: int
-        guess6: int
+        guess1: int = Field(alias='1')
+        guess2: int = Field(alias='2')
+        guess3: int = Field(alias='3')
+        guess4: int = Field(alias='4')
+        guess5: int = Field(alias='5')
+        guess6: int = Field(alias='6')
         fail: int
 # Edit guess1 to 1, guess2 to 2, etc.
 class Stats(BaseModel):
@@ -33,9 +33,6 @@ class Result(BaseModel):
     timestamp: str
     number_of_guesses: int
 
-class TopWinner(BaseModel):
-    username: str
-    wins: int
 
 def get_db():
     """Connect words.db"""
@@ -48,10 +45,10 @@ app = FastAPI()
 
 
 @app.post("/stats/games/{game_id}")
-async def add_game_played(user_id: int, result: Result, db: sqlite3.Connection = Depends(get_db)):
+async def add_game_played(game_id: int, user_id: int, result: Result, db: sqlite3.Connection = Depends(get_db)):
     """Posting a win or loss"""
     # post into games
-    cur = db.execute("SELECT user_id FROM users JOIN games USING user_id WHERE user_id = ?", [user_id])
+    cur = db.execute("SELECT user_id FROM users WHERE user_id = ?", [user_id])
     looking_for = cur.fetchall()
     if not looking_for:
         raise HTTPException(
@@ -59,19 +56,19 @@ async def add_game_played(user_id: int, result: Result, db: sqlite3.Connection =
         )
     cur = db.execute("SELECT game_id, user_id FROM games WHERE game_id = ? AND user_id = ?", [game_id, user_id])
     looking_for = cur.fetchall()
-    if not looking_for:
+    if looking_for:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Game for player not found"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Game for player laready exists"
         )
-    cur = db.execute("INSERT INTO games VALUES(?,?,?,?)", [user_id, game_id, result.timestamp, result.guesses, result.status])
+    cur = db.execute("INSERT INTO games VALUES(?,?,?,?,?)", [user_id, game_id, result.timestamp, result.number_of_guesses, result.status])
     db.commit()
     return result
 
-@app.get("/stats/games/{user_id}")
-async def retrieve_player_stats(result: Result, db: sqlite3.Connection = Depends(get_db)):
+@app.get("/stats/games/{user_id}/")
+async def retrieve_player_stats(user_id: int, db: sqlite3.Connection = Depends(get_db)):
     """Getting stats of a user"""
     # use table: games
-    cur = db.execute("SELECT user_id FROM users JOIN games USING user_id WHERE user_id = ?", [user_id])
+    cur = db.execute("SELECT user_id FROM users WHERE user_id = ?", [user_id])
     looking_for = cur.fetchall()
     if not looking_for:
         raise HTTPException(
@@ -80,22 +77,19 @@ async def retrieve_player_stats(result: Result, db: sqlite3.Connection = Depends
     pass
 
 
-@app.get("/stats/wins")
+@app.get("/stats/wins/")
 async def retrieve_top_wins(db: sqlite3.Connection = Depends(get_db)):
     """Getting the top 10 users by number of wins"""
     # use view: wins
-    cur = db.execute("SELECT username FROM users JOIN wins USING user_id LIMIT 10")
+    # How coudl I also get their number of wins??????????
+    cur = db.execute("SELECT username FROM users NATURAL JOIN wins LIMIT 10")
     looking_for = cur.fetchall()
-    plr: TopWinner
-    plr_list = []
-    for i in range(len(looking_for)):
-        plr.username = looking_for[i][0]
-        plr.wins= looking_for[i][1]
-        plr_list.append(plr)
-    return {"top_wins": plr_list}
+    return {"TopWinners": looking_for}
 
-@app.get("/stats/streaks")
-async def retrieve_top_streaks(result: Result, db: sqlite3.Connection = Depends(get_db)):
+@app.get("/stats/streaks/")
+async def retrieve_top_streaks(db: sqlite3.Connection = Depends(get_db)):
     """Getting the top 10 users by streak"""
     # use view: streaks
-    pass
+    cur = db.execute("SELECT username, streak FROM users NATURAL JOIN streaks ORDER BY streak DESC LIMIT 10")
+    looking_for = cur.fetchall()
+    return {"TopStreaks": looking_for}
