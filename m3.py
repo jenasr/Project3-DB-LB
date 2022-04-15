@@ -74,6 +74,37 @@ async def retrieve_player_stats(user_id: int, db: sqlite3.Connection = Depends(g
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+    # ??????
+    # currentStreak = streak at MAX(Date) if the DATE is the same day otherwise 0
+    #???????
+    cur = db.execute("SELECT streak, MAX(finished) FROM streaks WHERE user_id = ?", [user_id])
+    currentStreak = cur.fetchall()[0][0]
+
+    # maxStreak = MAX(streak)
+    cur = db.execute("SELECT ending FROM streaks WHERE user_id = ?", [user_id])
+    maxStreak = cur.fetchall()[0][0]
+    # guesses: for each get the COUNT(each game they had n number of guesses)
+    guess_list = []
+    int i = 1
+    while len(guess_list) < 6:
+        cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ? AND guesses = ?", [user_id, i])
+        guess = cur.fetchall()[0][0]
+        guess_list.append(guess)
+        i += 1
+    # need to get failed: COUNT(games lost)
+    cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ? AND won = ?", [user_id, False])
+    gamesWon = cur.fetchall()[0][0]    
+    # winPercentage: COUNT(wins) / COUNT(games player by user)
+    # gamesPlayed:  COUNT(games player by user)
+    # gamesWon: COUNT(wins)
+    cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ?", [user_id])
+    gamesPlayed = cur.fetchall()[0][0]
+    cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ? AND won = ?", [user_id, True])
+    gamesWon = cur.fetchall()[0][0]
+    winPercentage = (gamesWon / gamesPlayed) * 100
+
+    # averageGuesses: guesses.items / 6
+    averageGuesses = sum(guess_list) / 6
     pass
 
 
