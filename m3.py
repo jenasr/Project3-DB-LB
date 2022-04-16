@@ -9,12 +9,12 @@ from pydantic import BaseModel, Field
 
 
 class Guesses(BaseModel):
-        guess1: int = Field(alias='1')
-        guess2: int = Field(alias='2')
-        guess3: int = Field(alias='3')
-        guess4: int = Field(alias='4')
-        guess5: int = Field(alias='5')
-        guess6: int = Field(alias='6')
+        guess1: int# = Field(alias='1')
+        guess2: int# = Field(alias='2')
+        guess3: int# = Field(alias='3')
+        guess4: int# = Field(alias='4')
+        guess5: int# = Field(alias='5')
+        guess6: int# = Field(alias='6')
         fail: int
 # Edit guess1 to 1, guess2 to 2, etc.
 class Stats(BaseModel):
@@ -77,35 +77,40 @@ async def retrieve_player_stats(user_id: int, db: sqlite3.Connection = Depends(g
     # ??????
     # currentStreak = streak at MAX(Date) if the DATE is the same day otherwise 0
     #???????
-    cur = db.execute("SELECT streak, MAX(finished) FROM streaks WHERE user_id = ?", [user_id])
-    currentStreak = cur.fetchall()[0][0]
+    current_streak = 0
+    cur = db.execute("SELECT streak, ending FROM streaks WHERE user_id = ?", [user_id])
+    looking_for = cur.fetchall()
+    if looking_for:
+        current_streak = looking_for[0][0]
 
     # maxStreak = MAX(streak)
-    cur = db.execute("SELECT ending FROM streaks WHERE user_id = ?", [user_id])
-    maxStreak = cur.fetchall()[0][0]
+    cur = db.execute("SELECT MAX(streak) FROM streaks WHERE user_id = ?", [user_id])
+    max_streak = cur.fetchall()[0][0]
     # guesses: for each get the COUNT(each game they had n number of guesses)
     guess_list = []
-    int i = 1
+    i = 1
     while len(guess_list) < 6:
         cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ? AND guesses = ?", [user_id, i])
         guess = cur.fetchall()[0][0]
-        guess_list.append(guess)
+        guess_list.append(int(guess))
         i += 1
     # need to get failed: COUNT(games lost)
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ? AND won = ?", [user_id, False])
-    gamesWon = cur.fetchall()[0][0]    
+    games_lost = cur.fetchall()[0][0]
+    guesses1 = Guesses(guess1=guess_list[0], guess2=guess_list[1], guess3=guess_list[2], guess4=guess_list[3], guess5=guess_list[4], guess6=guess_list[5], fail=games_lost)
     # winPercentage: COUNT(wins) / COUNT(games player by user)
     # gamesPlayed:  COUNT(games player by user)
     # gamesWon: COUNT(wins)
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ?", [user_id])
-    gamesPlayed = cur.fetchall()[0][0]
+    games_played = cur.fetchall()[0][0]
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE user_id = ? AND won = ?", [user_id, True])
-    gamesWon = cur.fetchall()[0][0]
-    winPercentage = (gamesWon / gamesPlayed) * 100
+    games_won = cur.fetchall()[0][0]
+    win_percentage = (games_won / games_played) * 100
 
     # averageGuesses: guesses.items / 6
-    averageGuesses = sum(guess_list) / 6
-    pass
+    average_guesses = sum(guess_list) // 6
+    stat = Stats(currentStreak=current_streak, maxStreak=max_streak, guesses=guesses1, winPercentage=win_percentage, gamesPlayed=games_played, gamesWon=games_won, averageGuesses=average_guesses)
+    return stat
 
 
 @app.get("/stats/wins/")
