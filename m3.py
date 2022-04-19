@@ -7,7 +7,6 @@ import sqlite3
 from fastapi import FastAPI, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-
 class Guesses(BaseModel):
         guess1: int# = Field(alias='1')
         guess2: int# = Field(alias='2')
@@ -82,6 +81,7 @@ async def retrieve_player_stats(user_id: int, db: sqlite3.Connection = Depends(g
     looking_for = cur.fetchall()
     if looking_for:
         current_streak = looking_for[0][0]
+    #Current date into sqlite
 
     # maxStreak = MAX(streak)
     cur = db.execute("SELECT MAX(streak) FROM streaks WHERE user_id = ?", [user_id])
@@ -117,7 +117,7 @@ async def retrieve_player_stats(user_id: int, db: sqlite3.Connection = Depends(g
 async def retrieve_top_wins(db: sqlite3.Connection = Depends(get_db)):
     """Getting the top 10 users by number of wins"""
     # use view: wins
-    # How coudl I also get their number of wins??????????
+    # Get number of wins
     cur = db.execute("SELECT username FROM users NATURAL JOIN wins LIMIT 10")
     looking_for = cur.fetchall()
     return {"TopWinners": looking_for}
