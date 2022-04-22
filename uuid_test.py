@@ -26,3 +26,8 @@ c.execute('INSERT INTO test VALUES (?,?)', data)
 
 c.execute('SELECT * FROM test')
 print(f'Result Data: {c.fetchone()}')
+
+
+
+# add_game_played(game_id: int, user_id: int, result: Result, db: sqlite3.Connection = Depends(get_db)):
+# have it return a list of db names
