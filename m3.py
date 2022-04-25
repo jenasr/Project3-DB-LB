@@ -63,20 +63,21 @@ async def add_game_played(game_id: int, unique_id: uuid.UUID, result: Result):
 
     db.execute("ATTACH DATABASE 'DB/Shards/user_profiles.db' As 'up'")
 
-    cur = db.execute("SELECT unique_id FROM up.users WHERE unique_id = ?", [unique_id])
+    cur = db.execute("SELECT user_id FROM up.users WHERE unique_id = ?", [unique_id])
     looking_for = cur.fetchall()
     if not looking_for:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
+    tmp_user_id = looking_for[0][0]
     cur = db.execute("SELECT game_id, unique_id FROM games WHERE game_id = ? AND unique_id = ?", [game_id, unique_id])
     looking_for = cur.fetchall()
     if looking_for:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Game for player already exists"
         )
-    cur = db.execute("INSERT INTO games VALUES(?,?,?,?,?)", [user_id, game_id, result.timestamp, result.number_of_guesses, result.status, unique_id])
-    db.commit()
+    cur = db.execute("INSERT INTO games VALUES(?,?,?,?,?,?)", [tmp_user_id, game_id, result.timestamp, result.number_of_guesses, result.status, unique_id])
+    con.commit()
     db.close()
     return result
 
@@ -86,10 +87,10 @@ async def retrieve_player_stats(unique_id: uuid.UUID):
     # use table: games
     sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
     sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
-    if (unique_id % 3 == 0):
+    if (int(unique_id) % 3 == 0):
         con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
-    elif (unique_id % 3 == 1):
+    elif (int(unique_id) % 3 == 1):
         con = sqlite3.connect("DB/Shards/stats2.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
     else:
@@ -109,18 +110,18 @@ async def retrieve_player_stats(unique_id: uuid.UUID):
     current_streak = 0
     cur = db.execute("SELECT ending FROM streaks WHERE unique_id = ?", [unique_id])
     looking_for = cur.fetchall()
+    if not looking_for:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found in streaks"
+        )
     max_date = looking_for[0][0]
     cur = db.execute("SELECT streak FROM streaks WHERE unique_id = ? AND ending = ?", [unique_id, the_date])
     looking_for = cur.fetchall()
-
+    #### SOME USER WILL GENERATE A MAX DATE WHICH IS EMPTY, IS THIS ALRIGHT????????
     if looking_for:
         current_streak = looking_for[0][0]
-    #Current date into sqlite
-
-    # maxStreak = MAX(streak)
     cur = db.execute("SELECT MAX(streak) FROM streaks WHERE unique_id = ?", [unique_id])
     max_streak = cur.fetchall()[0][0]
-    # guesses: for each get the COUNT(each game they had n number of guesses)
     guess_list = []
     i = 0
     while len(guess_list) < 6:
@@ -128,22 +129,13 @@ async def retrieve_player_stats(unique_id: uuid.UUID):
         guess = cur.fetchall()[0][0]
         guess_list.append(int(guess))
         i += 1
-    # return guess_list
-
-    # need to get failed: COUNT(games lost)
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE unique_id = ? AND won = ?", [unique_id, False])
     games_lost = cur.fetchall()[0][0]
-
-    # winPercentage: COUNT(wins) / COUNT(games player by user)
-    # gamesPlayed:  COUNT(games player by user)
-    # gamesWon: COUNT(wins)
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE unique_id = ?", [unique_id])
     games_played = cur.fetchall()[0][0]
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE unique_id = ? AND won = ?", [unique_id, True])
     games_won = cur.fetchall()[0][0]
     win_percentage = trunc((games_won / games_played) * 100)
-
-    # averageGuesses: guesses.items / 6
     average_guesses = sum(guess_list) // 6
     stat = Stats(currentStreak=current_streak, maxStreak=max_streak, guesses=Guesses(fail=0), winPercentage=win_percentage, gamesPlayed=games_played, gamesWon=games_won, averageGuesses=average_guesses)
     stat.guesses.guess1 = guess_list[0]
@@ -165,14 +157,18 @@ async def retrieve_top_wins():
     sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
     con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
     db = con.cursor()
+    # HOW DO I ACCESS COUNT(won) ????????????????????????????????
+    db.execute("ATTACH DATABASE 'DB/Shards/user_profiles.db' As 'up'")
     db.execute("ATTACH DATABASE 'DB/Shards/stats2.db' As 's2'")
     db.execute("ATTACH DATABASE 'DB/Shards/stats3.db' AS 's3'")
-    cur = db.execute("""SELECT unique_id FROM
-    SELECT unique_id FROM streaks LIMIT 10 UNION (
-    SELECT unique_id FROM s2.streaks LIMIT 10 UNION
-    SELECT unique_id FROM s3.streaks LIMIT 10) LIMIT 10""")
+    cur = db.execute("SELECT username, COUNT(won) FROM wins JOIN up.users ON wins.unique_id=up.users.unique_id LIMIT 10")
     looking_for = cur.fetchall()
-    return {"TopWinners": looking_for}
+    cur = db.execute("SELECT username, COUNT(s2.won) FROM s2.wins JOIN up.users ON s2.wins.unique_id=up.users.unique_id LIMIT 10")
+    looking_for += cur.fetchall()
+    cur = db.execute("SELECT username, s3.COUNT(s3.won) FROM s3.wins JOIN up.users ON s3.wins.unique_id=up.users.unique_id LIMIT 10")
+    looking_for += cur.fetchall()
+    looking_for.sort(key = lambda x: x[1], reverse=True)
+    return {"TopWinners": looking_for[:10]}
 
 @app.get("/stats/streaks/")
 async def retrieve_top_streaks(db: sqlite3.Connection = Depends(get_db)):
@@ -182,12 +178,14 @@ async def retrieve_top_streaks(db: sqlite3.Connection = Depends(get_db)):
     sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
     con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
     db = con.cursor()
+    db.execute("ATTACH DATABASE 'DB/Shards/user_profiles.db' As 'up'")
     db.execute("ATTACH DATABASE 'DB/Shards/stats2.db' As 's2'")
     db.execute("ATTACH DATABASE 'DB/Shards/stats3.db' AS 's3'")
-    cur = db.execute("""SELECT unique_id, streak FROM
-    (SELECT unique_id, streak FROM streaks UNION
-    SELECT unique_id, streak FROM s2.streaks UNION
-    SELECTunique_id, streak FROM s3.streaks)
-    ORDER BY streak DESC LIMIT 10""")
+    cur = db.execute("SELECT username, streak FROM streaks JOIN up.users ON streaks.unique_id=up.users.unique_id ORDER BY streak DESC LIMIT 10")
     looking_for = cur.fetchall()
-    return {"TopStreaks": looking_for}
+    cur = db.execute("SELECT username, streak FROM s2.streaks JOIN up.users ON s2.streaks.unique_id=up.users.unique_id ORDER BY streak DESC LIMIT 10")
+    looking_for += cur.fetchall()
+    cur = db.execute("SELECT username, streak FROM s3.streaks JOIN up.users ON s3.streaks.unique_id=up.users.unique_id ORDER BY streak DESC LIMIT 10")
+    looking_for += cur.fetchall()
+    looking_for.sort(key = lambda x: x[1], reverse=True)
+    return {"Top10Streaks": looking_for[:10]}

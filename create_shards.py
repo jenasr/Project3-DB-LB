@@ -3,7 +3,7 @@ import sqlite3
 import uuid
 import os.path
 
-column_added = True
+column_added = False
 def add_uuids():
     sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
     sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
@@ -68,6 +68,7 @@ def sharding():
     cur3.execute("CREATE TABLE users(user_id INTEGER PRIMARY KEY, username VARCHAR UNIQUE, unique_id GUID)")
     con3.commit()
     cur3.executemany("INSERT INTO users VALUES(?, ?, ?)", list1)
+    con3.commit()
     con3.close()
     con1.close()
 
