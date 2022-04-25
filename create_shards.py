@@ -11,20 +11,25 @@ def add_uuids():
     cur = con.cursor()
     if not column_added:
         cur.execute("ALTER TABLE users ADD unique_id GUID")
-    the_tuples = cur.execute("SELECT * from users")
+    cur.execute("SELECT * from users")
+    the_tuples = cur.fetchall()
     user_id_dict = {}
-    g_uuid = uuid.uuid1()
     for t in the_tuples:
-        a_uuid = uuid.uuid1()
+        a_uuid = uuid.uuid4()
+
+        user_id_dict[t[0]] = a_uuid
         cur.execute("UPDATE users SET unique_id = ? WHERE user_id = ?", [a_uuid, t[0]])
-        con.commit()
+        print(a_uuid)
+    con.commit()
     if not column_added:
         cur.execute("ALTER TABLE games ADD unique_id GUID")
-    the_tuples = cur.execute("SELECT * FROM games")
-    g_uuid = a_uuid
+    cur.execute("SELECT * FROM games")
+    the_tuples = cur.fetchall()
+    print(user_id_dict)
     for t in the_tuples:
-        cur.execute("UPDATE games SET unique_id = ? WHERE user_id = ?", [g_uuid, t[0]])
-        con.commit()
+        cur.execute("UPDATE games SET unique_id = ? WHERE user_id = ?", [user_id_dict[t[0]], t[0]])
+        print(t[1])
+    con.commit()
 
 def sharding():
     sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))

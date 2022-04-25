@@ -46,20 +46,22 @@ app = FastAPI()
 
 
 @app.post("/stats/games/{game_id}")
-async def add_game_played(game_id: int, unique_id: str, result: Result):
+async def add_game_played(game_id: int, unique_id: uuid.UUID, result: Result):
     """Posting a win or loss"""
     # post into games
-    if (unique_id % 3 == 0):
-        con = sqlite3.connect("DB/Shards/stats1.db")
+    sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
+    sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
+    if (int(unique_id) % 3 == 0):
+        con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
-    elif (unique_id % 3 == 1):
-        con = sqlite3.connect("DB/Shards/stats2.db")
+    elif (int(unique_id) % 3 == 1):
+        con = sqlite3.connect("DB/Shards/stats2.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
     else:
-        con = sqlite3.connect("DB/Shards/stats3.db")
+        con = sqlite3.connect("DB/Shards/stats3.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
 
-    db.attach("up", "user_profiles.db")
+    db.execute("ATTACH DATABASE 'DB/Shards/user_profiles.db' As 'up'")
 
     cur = db.execute("SELECT unique_id FROM up.users WHERE unique_id = ?", [unique_id])
     looking_for = cur.fetchall()
@@ -82,17 +84,19 @@ async def add_game_played(game_id: int, unique_id: str, result: Result):
 async def retrieve_player_stats(unique_id: uuid.UUID):
     """Getting stats of a user"""
     # use table: games
+    sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
+    sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
     if (unique_id % 3 == 0):
-        con = sqlite3.connect("DB/Shards/stats1.db")
+        con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
     elif (unique_id % 3 == 1):
-        con = sqlite3.connect("DB/Shards/stats2.db")
+        con = sqlite3.connect("DB/Shards/stats2.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
     else:
-        con = sqlite3.connect("DB/Shards/stats3.db")
+        con = sqlite3.connect("DB/Shards/stats3.db", detect_types=sqlite3.PARSE_DECLTYPES)
         db = con.cursor()
 
-    db.attach("up", "user_profiles.db")
+    db.execute("ATTACH DATABASE 'DB/Shards/user_profiles.db' As 'up'")
 
     cur = db.execute("SELECT unique_id FROM up.users WHERE unique_id = ?", [unique_id])
     looking_for = cur.fetchall()
@@ -157,7 +161,9 @@ async def retrieve_top_wins():
     """Getting the top 10 users by number of wins"""
     # use view: wins
     # Get number of wins
-    con = sqlite3.connect("DB/Shards/stats1.db")
+    sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
+    sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
+    con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
     db = con.cursor()
     db.execute("ATTACH DATABASE 'DB/Shards/stats2.db' As 's2'")
     db.execute("ATTACH DATABASE 'DB/Shards/stats3.db' AS 's3'")
@@ -172,7 +178,9 @@ async def retrieve_top_wins():
 async def retrieve_top_streaks(db: sqlite3.Connection = Depends(get_db)):
     """Getting the top 10 users by streak"""
     # use view: streaks
-    con = sqlite3.connect("DB/Shards/stats1.db")
+    sqlite3.register_converter('GUID', lambda b: uuid.UUID(bytes_le=b))
+    sqlite3.register_adapter(uuid.UUID, lambda u: memoryview(u.bytes_le))
+    con = sqlite3.connect("DB/Shards/stats1.db", detect_types=sqlite3.PARSE_DECLTYPES)
     db = con.cursor()
     db.execute("ATTACH DATABASE 'DB/Shards/stats2.db' As 's2'")
     db.execute("ATTACH DATABASE 'DB/Shards/stats3.db' AS 's3'")
