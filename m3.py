@@ -107,21 +107,18 @@ async def retrieve_player_stats(unique_id: uuid.UUID):
         )
     today = date.today()
     the_date = today.strftime("%Y-%m-%d")
-    current_streak = 0
-    cur = db.execute("SELECT ending FROM streaks WHERE unique_id = ?", [unique_id])
-    looking_for = cur.fetchall()
-    if not looking_for:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found in streaks"
-        )
-    max_date = looking_for[0][0]
+    max_streak = current_streak = 0
     cur = db.execute("SELECT streak FROM streaks WHERE unique_id = ? AND ending = ?", [unique_id, the_date])
     looking_for = cur.fetchall()
-    #### SOME USER WILL GENERATE A MAX DATE WHICH IS EMPTY, IS THIS ALRIGHT????????
     if looking_for:
         current_streak = looking_for[0][0]
     cur = db.execute("SELECT MAX(streak) FROM streaks WHERE unique_id = ?", [unique_id])
-    max_streak = cur.fetchall()[0][0]
+    looking_for = cur.fetchall()
+    ### WHY IS IT NONE??????????????????????????????????????????
+    if looking_for:
+        max_streak = looking_for[0][0]
+        if max_streak == None:
+            max_streak = 0
     guess_list = []
     i = 0
     while len(guess_list) < 6:
@@ -135,7 +132,10 @@ async def retrieve_player_stats(unique_id: uuid.UUID):
     games_played = cur.fetchall()[0][0]
     cur = db.execute("SELECT COUNT(game_id) FROM games WHERE unique_id = ? AND won = ?", [unique_id, True])
     games_won = cur.fetchall()[0][0]
-    win_percentage = trunc((games_won / games_played) * 100)
+    if games_played != 0:
+        win_percentage = trunc((games_won / games_played) * 100)
+    else:
+        win_percentage = trunc(0.0)
     average_guesses = sum(guess_list) // 6
     stat = Stats(currentStreak=current_streak, maxStreak=max_streak, guesses=Guesses(fail=0), winPercentage=win_percentage, gamesPlayed=games_played, gamesWon=games_won, averageGuesses=average_guesses)
     stat.guesses.guess1 = guess_list[0]
