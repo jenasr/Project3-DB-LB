@@ -16,4 +16,5 @@
 3. uvicorn m3:app --reload
 
 ##### Using Traefik:
-1. FILL IN
+1. ./traefik --configFile=traefik.toml
+2. foreman start -m 'word=1, game=1, stat=3'
