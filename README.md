@@ -5,7 +5,7 @@
 ## Kevin Garcia
 
 
-#### Databases (Located in DB/):
+#### Databases (Executables located in DB/):
 1. Initialize database: execute create_stats_db.sh in the terminal
 2. Create shards: execute create_shards.py in the terminal
 
