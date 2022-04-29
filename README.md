@@ -4,4 +4,16 @@
 ## Samuel Valls
 ## Kevin Garcia
 
-1.  Initialize database: execute create_stats_db.sh in the terminal  
+
+#### Databases:
+1. Initialize database: execute create_stats_db.sh in the terminal
+2. Create shards: execute create_shards.py in the terminal
+
+#### Starting services:
+##### Standalone:
+1. uvicorn m1:app --reload
+2. uvicorn m2:app --reload
+3. uvicorn m3:app --reload
+
+##### Using Traefik:
+1. FILL IN
